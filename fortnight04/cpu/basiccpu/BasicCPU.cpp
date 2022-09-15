@@ -383,7 +383,7 @@ int BasicCPU::EXI()
 			ALUout = A - B;
 			return 0;
 		default:
-			// Controle não implementado
+			// Controle D10043FFnão implementado
 			return 1;
 	}
 	

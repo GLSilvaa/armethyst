@@ -127,14 +127,49 @@ int BasicCPU::ID()
 		// implementar o GRUPO A SEGUIR
 		//
 		// 101x Loads and Stores on page C4-237
+		//implentar Loads
+		//implentar Stores
 
-		
-		// ATIVIDADE FUTURA
-		// implementar os demais grupos
+		// x110 Data Processing -- Register on page C4-278
+		case 0x1C000000:
+		case 0x1E000000:
+			return decodeDataProcReg();
+			break;
+		// x111 Data Processing -- Register on page C4-278
+		case 0x1E800000:
+		case 0x1F800000:
+			return decodeDataProcReg();
+			break;
+		// x111 Data Processing -- Register on page C4-278
+		case 0x1F000000:
+		case 0x1F400000:
+			return decodeDataProcReg();
+			break;
+		// implentar o GRUPO A SEGUIR
+		//
+		// 111x Loads and Stores on page C4-237
+		//implentar Stores
+		//implentar Loads
+
+		// xxxx Data Processing -- Immediate on page C4-278
+		case 0x0C000000:
+		case 0x0E000000:
+			return decodeDataProcImm();
+			break;
+		// xxxx Data Processing -- Immediate on page C4-278
+		case 0x0E800000:
+		case 0x0F800000:
+			return decodeDataProcImm();
+			break;
+		// xxxx Data Processing -- Immediate on page C4-278
+		case 0x0F000000:
+		case 0x0F400000:
+			return decodeDataProcImm();
+			break;
+		// xxxx Data Processing -- Immediate on page C4-278
 		
 		default:
-			throw "instrução não implementada";
-			//~ return 1; // instrução não implementada
+			return 1; // instrução não implementada
 	}
 };
 
@@ -213,8 +248,52 @@ int BasicCPU::decodeDataProcImm() {
  *		   1: se a instrução não estiver implementada.
  */
 int BasicCPU::decodeBranches() {
-	// instrução não implementada
-	return 1;
+	switch (IR & 0xFC000000){
+		case 0x14000000:
+			signed int offset;
+			offset = ((signed int)((IR & 0x03FFFFFF) << 6) >> 4);
+			A = PC;
+			B = offset;
+			
+			// atribuir ALUctrl
+			ALUctrl = ALUctrlFlag::ADD;
+				
+			// atribuir MEMctrl
+			MEMctrl = MEMctrlFlag::MEM_NONE;
+				
+			// atribuir WBctrl
+			WBctrl = WBctrlFlag::RegWrite;
+				
+			// atribuir MemtoReg
+			MemtoReg = false;
+
+			return 0;
+		default:
+			switch (IR & 0xFFFFFC1F) {
+			case 0xD65F0000:
+				int n;
+				n = (IR & 0x000003E0) >> 5;
+				A = getX(n);
+				B = 0; //B recebe 0, pois contém o valor da instrução passada
+
+				// atribuir ALUctrl
+				ALUctrl = ALUctrlFlag::ADD;
+				
+				// atribuir MEMctrl
+				MEMctrl = MEMctrlFlag::MEM_NONE;
+				
+				// atribuir WBctrl
+				WBctrl = WBctrlFlag::RegWrite;
+				
+				// atribuir MemtoReg
+				MemtoReg = false;
+
+				return 0;
+			
+			default:
+				return 1;
+			}
+	}
 }
 
 /**
@@ -225,8 +304,139 @@ int BasicCPU::decodeBranches() {
  *		   1: se a instrução não estiver implementada.
  */
 int BasicCPU::decodeLoadStore() {
-	// instrução não implementada
-	return 1;
+switch (IR & 0xFFC00000){
+		int n;
+ 		int t;
+		uint64_t offset;
+		//ldrsw
+		case 0xB9800000:
+			//Lendo A e B
+			n = (IR & 0x000003E0) >> 5;
+			if (n == 31) {
+				A = SP;
+			} else {
+				A = getX(n); // 64-bit variant
+			}
+			offset = (IR & 0x001FFE00) >> 10;//lendo imm12
+			offset = offset << 2; // LSL(ZeroExtend(imm12, 64), 2);
+			B = offset;
+
+			// TODO:
+			// implementar informações para os estágios MEM e WB.
+			// atribuir ALUctrl
+			ALUctrl = ALUctrlFlag::ADD;
+			
+			// atribuir MEMctrl
+			MEMctrl = MEMctrlFlag::READ64;
+			
+			// atribuir WBctrl
+			WBctrl = WBctrlFlag::RegWrite;
+			
+			// atribuir MemtoReg
+			MemtoReg = true;
+
+			return 0;
+
+			//STR size == 10 -- 32-bit variant
+		case 0xB9000000:
+			offset = (IR & 0x001FFE00) >> 10;//lendo imm12
+			offset = offset << 2; // LSL(ZeroExtend(imm12, 64), 2);
+			n = (IR & 0x000003E0) >> 5;
+			if (n == 31) {
+				A = SP;
+			} else {
+				A = getX(n); // 64-bit variant
+			}
+			B = offset;
+
+			// registrador destino
+			t = (IR & 0x0000001F);
+			if (t == 31) {
+				*Rd = 0;
+			} else {
+				Rd = &(R[t]);
+			}
+
+			// TODO:
+			// implementar informações para os estágios MEM e WB.
+			// atribuir ALUctrl
+			ALUctrl = ALUctrlFlag::ADD;
+			
+			// atribuir MEMctrl
+			MEMctrl = MEMctrlFlag::WRITE32;
+			
+			// atribuir WBctrl
+			WBctrl = WBctrlFlag::WB_NONE;
+			
+			// atribuir MemtoReg
+			MemtoReg = false;
+
+			return 0;
+		//ldr(immediate)
+		case 0xB9400000:
+			offset = (IR & 0x001FFE00) >> 10;//lendo imm12
+			offset = offset << 2; // LSL(ZeroExtend(imm12, 64), 2);
+			n = (IR & 0x000003E0) >> 5;
+			if (n == 31) {
+				A = SP;
+			} else {
+				A = getX(n); // 64-bit variant
+			}
+			B = offset;
+
+			// TODO:
+			// implementar informações para os estágios MEM e WB.
+			// atribuir ALUctrl
+			ALUctrl = ALUctrlFlag::ADD;
+			
+			// atribuir MEMctrl
+			MEMctrl = MEMctrlFlag::READ32;
+			
+			// atribuir WBctrl
+			WBctrl = WBctrlFlag::RegWrite;
+			
+			// atribuir MemtoReg
+			MemtoReg = true;
+
+			return 0;
+		default:
+			//ldr((register)
+			switch (IR & 0xFFE00C00){
+				int n;
+ 				int t;
+				int m;
+				//Implementação incompleta
+				//ldr
+				case 0xB8600800:
+				m = (IR & 0x001F0000) >> 16;
+				m += 0x0000001B;
+				n = (IR & 0x000003E0) >> 5;
+				if (n == 31) {
+					A = SP;
+				} else {
+					A = getX(n); // 64-bit variant
+				}
+				B = m;
+
+				// TODO:
+				// implementar informações para os estágios MEM e WB.
+				// atribuir ALUctrl
+				ALUctrl = ALUctrlFlag::ADD;
+				
+				// atribuir MEMctrl
+				MEMctrl = MEMctrlFlag::READ32;
+				
+				// atribuir WBctrl
+				WBctrl = WBctrlFlag::RegWrite;
+				
+				// atribuir MemtoReg
+				MemtoReg = true;
+				return 0;
+			default:
+				// instrução não implementada
+				return 1;
+		}
+	}
 }
 
 /**
